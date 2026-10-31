@@ -1,0 +1,18 @@
+[
+  {
+    "id": "crystal_slime",
+    "name": "Crystal Slime",
+    "weight": 2,
+    "stat_multiplier": 1.2,
+    "color_min": [
+      140,
+      140,
+      180
+    ],
+    "color_max": [
+      220,
+      220,
+      220
+    ]
+  }
+]

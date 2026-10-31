@@ -2,7 +2,7 @@
 import numpy as np
 
 import config as C
-from blocks import AIR, SOIL, GRASS, ROCK, WOOD, LEAF, WATER
+from blocks import AIR, SOIL, GRASS, ROCK, WOOD, LEAF, WATER, id_for_key
 import items
 from world.noise import value_noise2, value_noise3, hash2, hash3
 from world.worldgen_heights import surface_heights
@@ -50,33 +50,227 @@ def generate_chunk_full(seed, cx, cz, extended=False):
     water = (y > hh) & (y <= C.SEA_LEVEL)
     blocks[water & np.ones((S, H, S), bool)] = WATER
 
+    # Arid regions get a shallow, mineable sandstone layer before caves/structures are finalized.
+    _apply_sandstone_biomes(blocks, seed, x0, z0, h)
+
     blocks[:, 0, :] = ROCK                            # world floor
 
     arena = boss_arena.arena_near_chunk(seed, cx, cz)
+    _apply_common_rock_formations(blocks, seed, x0, z0, h, arena)
     if arena is not None:
         _carve_arena(blocks, arena, x0, z0)
     near = villages.villages_near_chunk(seed, cx, cz, pad=C.VILLAGE_TREE_MARGIN)
     keep_clear = _village_clear_mask(near, x0, z0)       # no trees / boulders where a village will stand
     keep_clear |= _entrance_mask(seed, ex[:, None], ez[None, :], ext_h)    # ... nor over a cave entrance
     outcrop = _place_outcrops(blocks, seed, x0, z0, ext_h, keep_clear)
+    _place_common_rock_outcrops(blocks, seed, x0, z0, ext_h, keep_clear)
     _plant_trees(blocks, seed, x0, z0, ext_h, keep_clear)
     for v in near:
         _build_village(blocks, h, v, x0, z0)             # after trees: it clears and levels its own ground
+    _apply_snow_biome(blocks, seed, x0, z0, h, near)
     minerals = _place_minerals(blocks, seed, wx, wy, wz, hh, outcrop, extended)
     return blocks, minerals
 
 
-def _plant_trees(blocks, seed, x0, z0, ext_h, keep_clear):
+def _mod_id(key):
+    """Return a registered MOD block ID, or None when its pack is disabled/missing."""
+    return id_for_key(key)
+
+
+def _apply_sandstone_biomes(blocks, seed, x0, z0, heights):
+    """Replace the upper four solid layers in dry regions with deterministic sandstone variants."""
+    yellow = _mod_id("sandstone_colors:yellow_sandstone")
+    red = _mod_id("sandstone_colors:red_sandstone")
+    white = _mod_id("sandstone_colors:white_sandstone")
+    gray = _mod_id("sandstone_colors:gray_sandstone")
+    if None in (yellow, red, white, gray):
+        return
+    xs = x0 + np.arange(S)[:, None]
+    zs = z0 + np.arange(S)[None, :]
+    dryness = value_noise2(xs, zs, 92.0, seed + 501)
+    palette = value_noise2(xs, zs, 37.0, seed + 502)
+    # Keep the starting area temperate so a new player always finds the familiar grass surface nearby.
+    desert = (dryness > 0.64) & (heights >= C.SEA_LEVEL + 1) & ((np.abs(xs) + np.abs(zs)) > 60)
+    # Large desert regions have a dominant yellow base; smaller geological patches vary the colour.
+    surface_id = np.where(palette < 0.20, red,
+                 np.where(palette < 0.42, white,
+                 np.where(palette > 0.84, gray, yellow)))
+    for depth in range(4):
+        yy = heights - depth
+        valid = desert & (yy > 0)
+        for block_id in (yellow, red, white, gray):
+            cols = valid & (surface_id == block_id)
+            if cols.any():
+                ix, iz = np.where(cols)
+                iy = yy[cols]
+                solid = (blocks[ix, iy, iz] != AIR) & (blocks[ix, iy, iz] != WATER)
+                blocks[ix[solid], iy[solid], iz[solid]] = block_id
+
+
+
+def _apply_snow_biome(blocks, seed, x0, z0, heights, nearby_villages):
+    """Turn cold-climate surface grass into snow and the top of lakes into solid ice.
+
+    The climate field is the same deterministic temperature field used by tree species,
+    so snowy regions blend naturally into the existing forests rather than forming a
+    separate map. Underground terrain and mineral generation are left untouched.
+    """
+    snow = _mod_id("snow_biome:snow")
+    ice = _mod_id("snow_biome:ice")
+    if snow is None or ice is None:
+        return
+
+    xs = x0 + np.arange(S)[:, None]
+    zs = z0 + np.arange(S)[None, :]
+    temperature = value_noise2(xs, zs, 115.0, seed + 511)
+    cold = temperature < 0.34
+    land = heights >= C.SEA_LEVEL
+
+    # Leave village plots clear so paths, floors and buildings keep their intended palette.
+    if nearby_villages:
+        village_clear = _village_clear_mask(nearby_villages, x0, z0)[2:S + 2, 2:S + 2]
+        cold &= ~village_clear
+
+    # A snow block replaces only the exposed grass surface. The ground height stays the
+    # same, so spawn positions, caves and the terrain silhouette do not shift.
+    top = heights.astype(np.int64)
+    ix, iz = np.where(cold & land)
+    for lx, lz in zip(ix, iz):
+        y = int(top[lx, lz])
+        if 0 <= y < H and blocks[lx, y, lz] == GRASS:
+            blocks[lx, y, lz] = snow
+
+    # Lakes retain their water below; only the exposed water surface becomes walkable ice.
+    frozen = cold & ~land & (blocks[:, C.SEA_LEVEL, :] == WATER)
+    blocks[:, C.SEA_LEVEL, :][frozen] = ice
+
+def _apply_common_rock_formations(blocks, seed, x0, z0, heights, arena=None):
+    """Replace ordinary underground rock with broad, deterministic mineral-free formations."""
+    granite = _mod_id("common_rocks:granite")
+    basalt = _mod_id("common_rocks:basalt")
+    limestone = _mod_id("common_rocks:limestone")
+    red_rock = _mod_id("common_rocks:red_rock")
+    if None in (granite, basalt, limestone, red_rock):
+        return
+
+    xs = x0 + np.arange(S)[:, None]
+    zs = z0 + np.arange(S)[None, :]
+    # Keep ordinary ROCK as the dominant underground material because only
+    # that block type can host mineral deposits. Geological variants should
+    # be occasional, compact patches rather than vast regions that suppress
+    # ore discovery. A high threshold limits coverage to roughly 10-15% of
+    # land columns; the smaller scale makes the patches less continent-sized.
+    formation = value_noise2(xs, zs, 20.0, seed + 601) > 0.80
+    if arena is not None:
+        ax, az = arena
+        arena_margin = C.ARENA_HALF + 2
+        formation &= ~((np.abs(xs - ax) <= arena_margin) & (np.abs(zs - az) <= arena_margin))
+    palette = value_noise2(xs, zs, 18.0, seed + 602)
+    y = np.arange(H)[None, :, None]
+    deep_solid = (blocks == ROCK) & (y > 1) & (y <= heights[:, None, :] - 4)
+    replace = deep_solid & formation[:, None, :]
+
+    for block_id, region in (
+        (granite, palette < 0.25),
+        (basalt, (palette >= 0.25) & (palette < 0.50)),
+        (limestone, (palette >= 0.50) & (palette < 0.75)),
+        (red_rock, palette >= 0.75),
+    ):
+        mask = replace & region[:, None, :]
+        blocks[mask] = block_id
+
+
+def _place_common_rock_outcrops(blocks, seed, x0, z0, ext_h, keep_clear):
+    """Expose small mineral-free geological boulders on the surface.
+
+    Underground formations are the main source, but surface outcrops make the
+    four rock families discoverable without having to dig first. Candidate
+    positions and rock type depend only on world coordinates and seed, so
+    adjacent chunks agree at their borders.
+    """
+    names = ("granite", "basalt", "limestone", "red_rock")
+    ids = [_mod_id(f"common_rocks:{name}") for name in names]
+    if any(block_id is None for block_id in ids):
+        return
+
     ex = np.arange(x0 - 2, x0 + S + 2)
     ez = np.arange(z0 - 2, z0 + S + 2)
-    chance = hash2(ex[:, None], ez[None, :], seed + 101)
+    xx, zz = ex[:, None], ez[None, :]
+    chance = hash2(xx, zz, seed + 701)
+    palette = value_noise2(xx, zz, 25.0, seed + 702)
     land = ext_h >= C.SEA_LEVEL + 1
-    for i, j in np.argwhere((chance < C.TREE_CHANCE) & land & ~keep_clear):
+    # Surface boulders are rare landmarks, not continuous fields.
+    candidates = (chance < 0.0018) & land & ~keep_clear
+
+    for i, j in np.argwhere(candidates):
         wx, wz = int(ex[i]), int(ez[j])
         ground = int(ext_h[i, j])
-        trunk = 4 + int(hash2(wx, wz, seed + 202) * 3)
+        rock_index = min(3, int(float(palette[i, j]) * 4))
+        block_id = ids[rock_index]
+        roll = hash2(wx, wz, seed + 703)
+        radius = 1 if roll < 0.55 else 2
+        height = 1 if roll < 0.72 else 2
+        for dy in range(height + 1):
+            rad = max(0, radius - (1 if dy == height and height > 1 else 0))
+            for dx in range(-rad, rad + 1):
+                for dz in range(-rad, rad + 1):
+                    if dx * dx + dz * dz > rad * rad + (1 if rad else 0):
+                        continue
+                    px, py, pz = wx + dx - x0, ground + dy, wz + dz - z0
+                    if (0 <= px < S and 0 <= pz < S and 0 < py < H
+                            and blocks[px, py, pz] in (AIR, GRASS, SOIL)):
+                        blocks[px, py, pz] = block_id
+
+
+def _plant_trees(blocks, seed, x0, z0, ext_h, keep_clear):
+    """Plant biome-specific MOD trees. Candidate coordinates and species are seed-stable across chunk borders."""
+    ex = np.arange(x0 - 2, x0 + S + 2)
+    ez = np.arange(z0 - 2, z0 + S + 2)
+    xx, zz = ex[:, None], ez[None, :]
+    chance = hash2(xx, zz, seed + 101)
+    land = ext_h >= C.SEA_LEVEL + 1
+
+    birch_log = _mod_id("tree_species:birch_log")
+    birch_leaf = _mod_id("tree_species:birch_leaves")
+    pine_log = _mod_id("tree_species:pine_log")
+    pine_leaf = _mod_id("tree_species:pine_leaves")
+    dark_log = _mod_id("tree_species:darkwood_log")
+    dark_leaf = _mod_id("tree_species:darkwood_leaves")
+    have_species = all(v is not None for v in (birch_log, birch_leaf, pine_log, pine_leaf, dark_log, dark_leaf))
+
+    # Broad climate fields create contiguous forests rather than random individual tree colours.
+    temperature = value_noise2(xx, zz, 115.0, seed + 511)
+    moisture = value_noise2(xx, zz, 78.0, seed + 512)
+    forest = moisture > 0.43
+    desert = value_noise2(xx, zz, 92.0, seed + 501) > 0.64
+    candidates = (chance < C.TREE_CHANCE) & land & ~keep_clear
+
+    for i, j in np.argwhere(candidates):
+        wx, wz = int(ex[i]), int(ez[j])
+        ground = int(ext_h[i, j])
+        if have_species and forest[i, j] and not desert[i, j]:
+            temp = temperature[i, j]
+            wet = moisture[i, j]
+            if temp < 0.38:
+                species = (pine_log, pine_leaf, "pine")
+            elif wet > 0.72:
+                species = (dark_log, dark_leaf, "darkwood")
+            else:
+                species = (birch_log, birch_leaf, "birch")
+        else:
+            species = (WOOD, LEAF, "normal")
+        log_block, leaf_block, kind = species
+
+        roll = hash2(wx, wz, seed + 202)
+        if kind == "pine":
+            trunk = 6 + int(roll * 4)
+        elif kind == "darkwood":
+            trunk = 5 + int(roll * 3)
+        else:
+            trunk = 4 + int(roll * 3)
         top_y = ground + trunk
-        if top_y + 2 >= H:
+        crown = 3 if kind == "pine" else (2 if kind == "darkwood" else 1)
+        if top_y + crown >= H:
             continue
         lx, lz = wx - x0, wz - z0
 
@@ -85,15 +279,31 @@ def _plant_trees(blocks, seed, x0, z0, ext_h, keep_clear):
                 if not only_air or blocks[px, py, pz] == AIR:
                     blocks[px, py, pz] = block
 
-        # Crown: two wide layers, one narrow layer, one cap.
-        for dy, r in ((-1, 2), (0, 2), (1, 1), (2, 1)):
-            for dx in range(-r, r + 1):
-                for dz in range(-r, r + 1):
-                    if r == 2 and abs(dx) == 2 and abs(dz) == 2:
-                        continue
-                    put(lx + dx, top_y + dy, lz + dz, LEAF, True)
+        if kind == "pine":
+            # Tall conical crown, one layer wider every two levels toward the bottom.
+            for dy in range(-3, 4):
+                radius = min(2, max(1, (3 - dy) // 2)) if dy <= 1 else 1
+                for dx in range(-radius, radius + 1):
+                    for dz in range(-radius, radius + 1):
+                        if abs(dx) + abs(dz) <= radius + 1:
+                            put(lx + dx, top_y + dy, lz + dz, leaf_block, True)
+        elif kind == "darkwood":
+            # Broad, rounded canopy with a sturdy trunk.
+            for dy, radius in ((-1, 2), (0, 2), (1, 2), (2, 1)):
+                for dx in range(-radius, radius + 1):
+                    for dz in range(-radius, radius + 1):
+                        if dx * dx + dz * dz <= radius * radius + 2:
+                            put(lx + dx, top_y + dy, lz + dz, leaf_block, True)
+        else:
+            # Birch has a compact, slightly taller crown; normal trees keep the original shape.
+            layers = ((-1, 2), (0, 2), (1, 1), (2, 1)) if kind == "normal" else ((-1, 2), (0, 2), (1, 1))
+            for dy, radius in layers:
+                for dx in range(-radius, radius + 1):
+                    for dz in range(-radius, radius + 1):
+                        if radius != 2 or abs(dx) != 2 or abs(dz) != 2:
+                            put(lx + dx, top_y + dy, lz + dz, leaf_block, True)
         for ty in range(ground + 1, top_y + 1):
-            put(lx, ty, lz, WOOD, False)
+            put(lx, ty, lz, log_block, False)
 
 
 def _entrance_mask(seed, xs, zs, heights):

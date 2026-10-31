@@ -2,7 +2,7 @@
 import numpy as np
 
 import config as C
-from blocks import AIR, ROCK, LEAF, WOOD, WATER
+from blocks import AIR, ROCK, LEAF, WOOD, WATER, FLOWER, BLOCKS
 from world.worldgen import generate_chunk_full
 
 S = C.CHUNK_SIZE
@@ -10,7 +10,7 @@ H = C.WORLD_HEIGHT
 
 
 class Chunk:
-    __slots__ = ("cx", "cz", "blocks", "minerals", "base", "edits", "ore_cleared", "modified")
+    __slots__ = ("cx", "cz", "blocks", "minerals", "base", "edits", "ore_cleared", "plants", "modified")
 
     def __init__(self, cx, cz, blocks, minerals=None):
         self.cx, self.cz = cx, cz
@@ -21,6 +21,7 @@ class Chunk:
         self.edits = {}             # (lx, y, lz) -> block id: the diff over generated terrain that gets saved
         self.ore_cleared = set()    # cells whose generated mineral was dug out: always kept in the diff, even if the
                                     # block is back to its generated type, or the ore would reappear after a reload
+        self.plants = {}           # (lx, y, lz) -> (mineral colour code, planted world-time seconds)
         self.modified = False       # changed since the last save/load
 
 
@@ -57,6 +58,7 @@ class World:
                 ch.minerals[lx, y, lz] = 0
             if int(ch.base[lx, y, lz]) != block or (lx, y, lz) in ch.ore_cleared:
                 ch.edits[(lx, y, lz)] = block
+        ch.plants.update(self.store.load_chunk_plants(ch.cx, ch.cz))
 
     def unload(self, cx, cz):
         """Drop a chunk's data from memory. Unsaved changes are never dropped; with a save store, saved edits
@@ -99,12 +101,34 @@ class World:
         if ch.minerals[lx, y, lz]:
             ch.ore_cleared.add((lx, y, lz))
             ch.minerals[lx, y, lz] = 0
+        ch.plants.pop((lx, y, lz), None)
         ch.modified = True
         if int(ch.base[lx, y, lz]) == block and (lx, y, lz) not in ch.ore_cleared:
             ch.edits.pop((lx, y, lz), None)
         else:
             ch.edits[(lx, y, lz)] = block
         self._mark_dirty(cx, cz, lx, y, lz)
+
+    def get_plant(self, x, y, z):
+        if not 0 <= y < H:
+            return None
+        ch = self.get_chunk(x >> 4, z >> 4)
+        return ch.plants.get((x & 15, y, z & 15))
+
+    def plant_flower_seed(self, x, y, z, color_code, planted_at):
+        """Place a flower block and persist its colour and planting time."""
+        if not 0 <= y < H or self.get_block(x, y, z) != AIR:
+            return False
+        self.set_block(x, y, z, FLOWER)
+        ch = self.get_chunk(x >> 4, z >> 4)
+        ch.plants[(x & 15, y, z & 15)] = (int(color_code), float(planted_at))
+        ch.modified = True
+        self._mark_dirty(x >> 4, z >> 4, x & 15, y, z & 15)
+        return True
+
+    def flower_mature(self, x, y, z, world_time, day_length):
+        plant = self.get_plant(x, y, z)
+        return bool(plant and world_time - plant[1] >= day_length)
 
     def remove_block(self, x, y, z):
         """Break a block. A bridge block placed on water turns back into water."""
@@ -136,7 +160,12 @@ class World:
     def is_blocking(self, x, y, z):
         """Collision test for one cell. Water blocks the body, and an invisible wall above water
         stops the player from standing on its surface (bridges are the only way across)."""
-        if self.get_block(x, y, z) != AIR:
+        block = self.get_block(x, y, z)
+        if block == FLOWER:
+            # Flower planters are thin decorative tiles, not full-height voxel walls.
+            # The soil beneath them remains the player's floor.
+            return False
+        if block != AIR:
             return True
         below = self.get_block(x, y - 1, z)
         if below == WATER:
@@ -148,8 +177,13 @@ class World:
     def surface_y(self, x, z):
         """Y of the highest block that is not a tree part (-1 if the column is empty)."""
         for y in range(H - 1, -1, -1):
-            if self.get_block(x, y, z) not in (AIR, LEAF, WOOD):
-                return y
+            block = self.get_block(x, y, z)
+            if block == AIR:
+                continue
+            info = BLOCKS.get(block)
+            if block in (LEAF, WOOD) or (info is not None and info.sound in ("leaf", "wood")):
+                continue
+            return y
         return -1
 
     def padded(self, cx, cz):

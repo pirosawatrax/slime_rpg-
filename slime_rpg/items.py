@@ -1,4 +1,4 @@
-"""Item ids. Blocks keep their block ids (1..6). Minerals are 1000 + colour code. A colour has three levels (r, g, b),
+"""Item ids. Built-in and MOD blocks keep their block ids (1..255). Minerals are 1000 + colour code. A colour has three levels (r, g, b),
 each 0..9 meaning 40 + 20 * level (40..220), and code = r*100 + g*10 + b (1000 colours).
 Before the boss falls only levels 1..8 (60..200) occur; the extra colours (a level 0 or 9 in any channel) appear after."""
 import numpy as np
@@ -6,6 +6,7 @@ import numpy as np
 import blocks
 
 MINERAL_BASE = 1000
+SEED_BASE = 2000
 LEVELS = 10
 LOW = 40
 STEP = 20
@@ -14,6 +15,18 @@ BASE_LEVEL_RANGE = (1, 8)             # levels that exist before the boss (60..2
 
 STACK_BY_TIER = (32, 24, 16)          # common, uncommon, rare
 HARDNESS_BY_TIER = (2.3, 3.0, 3.8)    # seconds to dig a rock that holds such a mineral
+
+
+def is_seed(item):
+    return SEED_BASE <= item < SEED_BASE + N_COLORS
+
+
+def seed_of(code):
+    return SEED_BASE + int(code)
+
+
+def seed_code(item):
+    return int(item) - SEED_BASE
 
 
 def is_mineral(item):
@@ -79,12 +92,14 @@ TIER_CODES, NEW_TIER_CODES = _pools()
 
 def is_valid_item(item):
     return (isinstance(item, int) and not isinstance(item, bool)
-            and (is_mineral(item) or item in blocks.PLACEABLE))
+            and (is_mineral(item) or is_seed(item) or item in blocks.PLACEABLE))
 
 
 def stack_limit(item):
     if is_mineral(item):
         return STACK_BY_TIER[tier(code_of(item))]
+    if is_seed(item):
+        return STACK_BY_TIER[tier(seed_code(item))]
     return blocks.stack_limit(item)
 
 

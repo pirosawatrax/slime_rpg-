@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 import config as C
-from blocks import AIR, GRASS
+from blocks import AIR, GRASS, id_for_key
 from game.physics import Body
 from world import boss_arena, villages
 from world.seeds import MAX_SEED, random_seed, seed_from_args
@@ -42,7 +42,7 @@ class TestRandomWorlds(unittest.TestCase):
             x, y, z = find_spawn(w)
             self.assertLessEqual(abs(x) + abs(z), 60, (seed, x, z))                       # starts near the origin
             cx, cy, cz = math.floor(x), int(round(y - 1.01)), math.floor(z)
-            self.assertEqual(w.get_block(cx, cy, cz), GRASS)
+            self.assertIn(w.get_block(cx, cy, cz), (GRASS, id_for_key("snow_biome:snow")))
             self.assertEqual(w.get_block(cx, cy + 1, cz), AIR, "no trunk or leaf at the spawn")
             self.assertFalse(w.is_blocking(cx, cy + 1, cz) or w.is_blocking(cx, cy + 2, cz))
             body = Body(w, x, y, z)

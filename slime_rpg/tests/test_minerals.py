@@ -62,7 +62,7 @@ class TestItems(unittest.TestCase):
     def test_item_validity(self):
         self.assertTrue(items.is_valid_item(ROCK))
         self.assertTrue(items.is_valid_item(items.item_of(511)))
-        for bad in (0, 6, GRASS, 999, 2000, -1, True, 1.5, "x"):
+        for bad in (0, 6, GRASS, 999, 3000, -1, True, 1.5, "x"):
             self.assertFalse(items.is_valid_item(bad), bad)
 
     def test_mixed_inventory_stacking(self):
@@ -338,7 +338,7 @@ class TestSavedStats(unittest.TestCase):
         s = game_save.restore_stats({"stats": {"level": 2, "hp": -5, "color": [100, 100, float("nan")]}})
         self.assertEqual((s.level, s.hp, s.color), (2, 1, C.START_COLOR))
         self.assertEqual(game_save.restore_stats({}).level, 1)
-        rows = [[items.item_of(COMMON), 99], [2000, 1], [items.item_of(COMMON), "x"]]
+        rows = [[items.item_of(COMMON), 99], [3000, 1], [items.item_of(COMMON), "x"]]
         inv = game_save.restore_inventory(rows)
         self.assertEqual(inv.slots[0], [items.item_of(COMMON), 32])        # clamped to the common stack limit
         self.assertIsNone(inv.slots[1]); self.assertIsNone(inv.slots[2])

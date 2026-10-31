@@ -82,17 +82,20 @@ class SaveStore:
     def _chunk_path(self, cx, cz):
         return self.dir / "chunks" / f"c_{cx}_{cz}.json"
 
-    def save_chunk_edits(self, cx, cz, edits):
+    def save_chunk_edits(self, cx, cz, edits, plants=None):
         """edits: {(lx, y, lz): block}. An empty diff removes the file (the chunk is back to generated terrain)."""
         path = self._chunk_path(cx, cz)
-        if not edits:
+        plants = plants or {}
+        if not edits and not plants:
             try:
                 path.unlink()
             except FileNotFoundError:
                 pass
             return
-        rows = [[lx, y, lz, int(b)] for (lx, y, lz), b in sorted(edits.items())]
-        _atomic_write(path, json.dumps({"v": 1, "edits": rows}, separators=(",", ":")))
+        rows = [[lx, y, lz, (BLOCKS[int(b)].key if int(b) >= 7 else int(b))]
+                for (lx, y, lz), b in sorted(edits.items())]
+        plant_rows = [[lx, y, lz, int(v[0]), float(v[1])] for (lx, y, lz), v in sorted(plants.items())]
+        _atomic_write(path, json.dumps({"v": 2, "edits": rows, "plants": plant_rows}, separators=(",", ":")))
 
     def load_chunk_edits(self, cx, cz):
         path = self._chunk_path(cx, cz)
@@ -113,13 +116,36 @@ class SaveStore:
         edits = {}
         for row in rows:
             try:
-                lx, y, lz, b = row
-                if (isinstance(lx, int) and isinstance(y, int) and isinstance(lz, int) and isinstance(b, int)
+                lx, y, lz, b = row[:4]
+                if isinstance(b, str):
+                    from blocks import id_for_key
+                    b = id_for_key(b)  # custom blocks are saved by namespaced key, not unstable runtime ID
+                if (isinstance(lx, int) and not isinstance(lx, bool) and isinstance(y, int) and not isinstance(y, bool)
+                        and isinstance(lz, int) and not isinstance(lz, bool) and isinstance(b, int) and not isinstance(b, bool)
                         and 0 <= lx < S and 0 <= lz < S and 0 <= y < H and (b == AIR or b in BLOCKS)):
                     edits[(lx, y, lz)] = b
             except (TypeError, ValueError):
                 continue
         return edits
+
+
+    def load_chunk_plants(self, cx, cz):
+        path = self._chunk_path(cx, cz)
+        if not path.is_file():
+            return {}
+        try:
+            with open(path, encoding="utf-8") as f:
+                rows = json.load(f).get("plants", [])
+            result = {}
+            for row in rows if isinstance(rows, list) else []:
+                lx, y, lz, color, planted = row
+                if (all(isinstance(v, int) and not isinstance(v, bool) for v in (lx, y, lz, color))
+                        and isinstance(planted, (int, float)) and not isinstance(planted, bool)
+                        and 0 <= lx < S and 0 <= lz < S and 0 <= y < H and 0 <= color < items.N_COLORS):
+                    result[(lx, y, lz)] = (color, float(planted))
+            return result
+        except (OSError, ValueError, KeyError, TypeError):
+            return {}
 
 
 def _migrate(meta):

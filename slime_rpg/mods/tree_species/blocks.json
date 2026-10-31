@@ -1,0 +1,134 @@
+[
+  {
+    "id": "birch_log",
+    "name": "Birch Log",
+    "hardness": 1.4,
+    "stack_limit": 32,
+    "sound": "wood",
+    "top": [
+      226,
+      211,
+      166
+    ],
+    "side": [
+      226,
+      218,
+      190
+    ],
+    "bottom": [
+      210,
+      193,
+      147
+    ]
+  },
+  {
+    "id": "birch_leaves",
+    "name": "Birch Leaves",
+    "hardness": 0.3,
+    "stack_limit": 64,
+    "sound": "leaf",
+    "top": [
+      112,
+      165,
+      68
+    ],
+    "side": [
+      91,
+      145,
+      55
+    ],
+    "bottom": [
+      75,
+      125,
+      47
+    ]
+  },
+  {
+    "id": "pine_log",
+    "name": "Pine Log",
+    "hardness": 1.7,
+    "stack_limit": 32,
+    "sound": "wood",
+    "top": [
+      151,
+      112,
+      72
+    ],
+    "side": [
+      111,
+      78,
+      48
+    ],
+    "bottom": [
+      133,
+      96,
+      60
+    ]
+  },
+  {
+    "id": "pine_leaves",
+    "name": "Pine Needles",
+    "hardness": 0.3,
+    "stack_limit": 64,
+    "sound": "leaf",
+    "top": [
+      48,
+      105,
+      72
+    ],
+    "side": [
+      37,
+      87,
+      61
+    ],
+    "bottom": [
+      29,
+      70,
+      51
+    ]
+  },
+  {
+    "id": "darkwood_log",
+    "name": "Darkwood Log",
+    "hardness": 2.0,
+    "stack_limit": 32,
+    "sound": "wood",
+    "top": [
+      104,
+      72,
+      52
+    ],
+    "side": [
+      67,
+      43,
+      33
+    ],
+    "bottom": [
+      88,
+      59,
+      43
+    ]
+  },
+  {
+    "id": "darkwood_leaves",
+    "name": "Darkwood Leaves",
+    "hardness": 0.4,
+    "stack_limit": 64,
+    "sound": "leaf",
+    "top": [
+      53,
+      104,
+      49
+    ],
+    "side": [
+      42,
+      85,
+      39
+    ],
+    "bottom": [
+      32,
+      68,
+      32
+    ]
+  }
+]

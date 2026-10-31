@@ -45,7 +45,8 @@ INVENTORY_SLOTS = 20
 
 # Mining
 HIT_INTERVAL = 0.25          # seconds between hit sounds while holding the button
-BREAK_COOLDOWN = 0.15        # pause after a block breaks
+BREAK_COOLDOWN = 0.15
+FLOWER_SEED_CHANCE = 0.025      # chance per dug soil/grass block to find a colour-coded flower seed        # pause after a block breaks
 MESSAGE_COOLDOWN = 1.0       # throttle for "Inventory full" messages
 
 # Fog (distance in blocks) at the surface and deep underground
@@ -57,7 +58,7 @@ FOG_FULL_DARK_DEPTH = 24     # blocks below the surface where fog reaches the de
 
 # Saving
 SAVE_VERSION = 2             # bump when the save FORMAT changes (add a migration in save/store.py)
-WORLDGEN_VERSION = 6         # bump when terrain generation changes: old chunk diffs may no longer fit
+WORLDGEN_VERSION = 11         # bump when terrain generation changes: old chunk diffs may no longer fit
 AUTOSAVE_SECONDS = 120
 
 # Minerals (stage 3). Colours are 8 levels per channel: 60, 80, ... 200 (512 colours).

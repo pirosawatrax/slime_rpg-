@@ -1,4 +1,4 @@
-# Slime RPG - That Time We Were All Reincarnated as Slimes
+# Slime RPG - Stage 6
 
 Chunked voxel world with fog, hold-to-break mining, bridges, a 20-slot inventory, save/load, minerals you can dig,
 carry and eat, terminal-style slime battles, levels, death, villages with commands, a day/night cycle and the Slime King.
@@ -14,6 +14,34 @@ one-tile villages were decided after that document was written).
 
 On Linux, `main.py` sets `XMODIFIERS=@im=none` itself (before Ursina loads) so fcitx5/ibus cannot swallow
 key-release events (symptom: keys keep "holding" and Space does nothing). `SLIME_KEEP_IME=1 python main.py` opts out.
+
+## MODs
+
+The game supports **data-only MODs**: folders of JSON files in `mods/` (or in the folder named by `SLIME_MODS_DIR`). The game never
+runs code from a MOD. A MOD can add **new enemy slime types** and **custom cube blocks** with individual colours, hardness, sounds,
+and inventory drops.
+
+Included examples: `mods/crystal_slime` adds a Crystal Slime; `mods/sandstone_colors` adds four sandstone colours;
+`mods/tree_species` adds birch, pine and darkwood logs and leaves; `mods/common_rocks` adds granite, basalt, limestone and red rock. Dry regions naturally generate sandstone layers, small, scattered geological patches naturally generate the four ordinary rock varieties underground, with rare matching outcrops also appearing on the surface, and climate-based forests naturally grow the tree species. The four common rock varieties do not contain minerals; mineral deposits remain exclusive to the original gray ROCK blocks. Custom wood logs can also be placed on water as bridges.
+
+**To add a MOD:** copy `mods/_template`, rename the copy, and edit `mod.json` plus `slimes.json` and/or `blocks.json`. Restart the game.
+The full format, limits and troubleshooting guide are in **[MODDING.md](MODDING.md)**.
+
+**Feedback while you work:** a MOD that cannot load is skipped (the others still load) and the game tells you at the start, in the
+terminal and on screen; the pause menu (Esc) lists the loaded MODs and counts problems. A misspelt key is ignored and reported as a
+warning, so it never fails silently. A MOD has hard limits (file size, slimes per MOD, number of MODs) so that a mistake cannot break
+the game. Saves do not depend on MODs, so removing a MOD never damages a save.
+
+Not supported yet: custom minerals, village trades, music, textures, translations, custom shapes and scripts. Python-script MODs are
+intentionally not enabled, because they could run arbitrary code on the player's computer.
+
+## Snowy regions
+
+Cold-climate areas appear naturally within the ordinary world; no separate map or new game mode is needed. The temperature field is shared with the tree-species climate: colder patches become snow-covered, exposed lake water becomes walkable ice while the water remains underneath, and the existing pine-tree preference makes snowy forests feel distinct. Snow replaces only the surface grass block, so terrain height, caves, underground minerals and the surrounding map layout stay unchanged. Village plots are kept clear.
+
+## Flower cultivation
+
+Digging Soil or Grass has a 2.5% chance to uncover a colour-coded flower seed. Select the seed and right-click a Grass/Soil block beside water to plant it in the empty cell above. The seedling appears on a thin brown tile with a small green sprout; after one full in-game day (600 seconds), the tile shows a coloured flower. The tile is decorative and does not behave like a full-height solid block. Breaking an immature seedling returns its seed; breaking a mature flower yields the mineral with the same colour code. Plant colour and planting time are saved with the chunk, so growth continues correctly after reloading.
 
 ## Controls
 
@@ -169,7 +197,7 @@ black dot eyes (no whites, no mouth).
 
 ## Tests (no Ursina needed)
 
-    python -m unittest discover -s tests -t .     # 198 engine-free tests
+    python -m unittest discover -s tests -t .     # 240 engine-free tests
     python tests/smoke_stub.py                    # runs main.py's loop against a fake ursina module
 
 ## Layout
@@ -177,7 +205,7 @@ black dot eyes (no whites, no mouth).
     main.py            Ursina glue only: window, camera, HUD, chunk entities, input
     config.py          every tunable number
     strings.py         every player-facing string (English)
-    blocks.py          the 6 block types: hardness, stack limit, sound family, drops, colours
+    blocks.py          built-in block types; MOD blocks add their own hardness, drops and colours
     world/             noise, worldgen, villages (tile + signpost), boss_arena (the lair), seeds, spawn, world, mesher, manager
     save/              store (files, atomic writes, validation), game_save (live objects <-> files)
     items.py           item ids; minerals = 1000 + colour code (rarity tiers, stack limits, dig times)

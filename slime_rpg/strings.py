@@ -7,7 +7,7 @@ LOST_FMT = "Lost: {name} x{count}"
 HUD_INVENTORY = "Inventory {used}/{total}"
 HUD_POSITION = "XYZ {x:.0f} {y:.0f} {z:.0f}   Depth {depth}"
 EMPTY_SLOT = "(empty)"
-HELP_TEXT = "WASD move | Space jump | Hold LMB dig | RMB place | E eat | Wheel/1-0 select | Q discard 1 | Esc menu"
+HELP_TEXT = "WASD move | Space jump | Hold LMB dig | RMB place / plant | E eat | Wheel/1-0 select | Q discard 1 | Esc menu"
 
 BLOCK_NAMES = {
     "soil": "Soil",
@@ -16,6 +16,13 @@ BLOCK_NAMES = {
     "wood": "Wood",
     "leaf": "Leaf",
     "water": "Water",
+    "flower": "Flower",
+    "snow_biome:snow": "Snow",
+    "snow_biome:ice": "Ice",
+    "common_rocks:granite": "Granite",
+    "common_rocks:basalt": "Basalt",
+    "common_rocks:limestone": "Limestone",
+    "common_rocks:red_rock": "Red Rock",
 }
 
 SAVED = "Game saved"
@@ -35,6 +42,8 @@ NO_SAVE = "No save to load"
 LOAD_FAILED = "Could not read the save file"
 
 MINERAL_NAME = "Mineral ({r},{g},{b})"
+FLOWER_SEED_NAME = "Flower seed ({r},{g},{b})"
+FLOWER_PLANTED = "Seed planted. It will bloom after one full day."
 HUD_HP = "Lv {level}   XP {xp}/{need}\nHP {hp}/{max_hp}\nATK {atk}  DEF {df}  SPD {spd}"
 HUD_COLOR = "Color {r:.0f},{g:.0f},{b:.0f}\nHue {h:.0f}  Sat {s:.0f}%"
 HUD_YOU = "You"
@@ -46,9 +55,10 @@ EAT_NOT_MINERAL = "Select a mineral to eat (E)"
 
 # battle (terminal style: "> " = an action, two spaces = its result, "* " = a notice)
 BATTLE_TITLE = "SLIME BATTLE"
-BATTLE_HEADER_ENEMY = "ENEMY  Slime  Lv {level}\nHP {hp}/{max_hp}   RGB {r:.0f},{g:.0f},{b:.0f}"
+BATTLE_HEADER_ENEMY = "ENEMY  {name}  Lv {level}\nHP {hp}/{max_hp}   RGB {r:.0f},{g:.0f},{b:.0f}"
 BATTLE_HEADER_YOU = "YOU  Lv {level}\nHP {hp}/{max_hp}   RGB {r:.0f},{g:.0f},{b:.0f}"
 BATTLE_APPEARED = "* A slime appears!"
+BATTLE_APPEARED_NAMED = "* {name} appears!"
 BTN_TACKLE = "[A] Tackle"
 BTN_THROW = "[T] Throw"
 BTN_EAT = "[E] Eat"
@@ -187,3 +197,10 @@ NEW_WORLD_LINES = ("Start a new game on a new, random map?", "Your current game 
                    "(You can also start with a chosen map: python main.py --seed 12345)")
 NEW_WORLD_YES = "Yes, start a new world"
 NEW_WORLD_NO = "No, keep playing"
+
+# ---- MODs
+MENU_MODS_NONE = "MODs: none"
+MENU_MODS = "MODs: {names}"
+MENU_MODS_PROBLEMS = "   ({n} problem(s): see the terminal)"
+MOD_NOTICE_SKIPPED = "{n} MOD(s) were skipped:\n{first}"
+MOD_NOTICE_WARNINGS = "{n} MOD warning(s): see the terminal"

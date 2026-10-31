@@ -16,6 +16,18 @@ _tmp = tempfile.mkdtemp(prefix="slime_smoke_")
 os.environ["SLIME_SEED"] = str(_C.SEED)                        # a fixed map for this script (new games are random otherwise)
 os.environ["SLIME_SAVE_DIR"] = os.path.join(_tmp, "save")      # never touch a real save
 
+# a MODs folder with one good MOD (with a misspelt key = a warning) and one broken MOD
+import json as _json                                           # noqa: E402
+_mods = os.path.join(_tmp, "mods")
+os.environ["SLIME_MODS_DIR"] = _mods
+for _folder, _meta, _slimes in (
+        ("smoke_ok", {"id": "smoke_ok", "name": "Smoke Mod", "api_version": 1},
+         [{"id": "smoke_slime", "name": "Smoke Slime", "weight": 1, "colour": [1, 2, 3]}]),
+        ("smoke_bad", {"id": "smoke_bad", "name": "Bad Mod", "api_version": 1, "enabled": "yes"}, [])):
+    os.makedirs(os.path.join(_mods, _folder))
+    _json.dump(_meta, open(os.path.join(_mods, _folder, "mod.json"), "w"))
+    _json.dump(_slimes, open(os.path.join(_mods, _folder, "slimes.json"), "w"))
+
 
 class Fake:
     def __init__(self, *a, **k):
@@ -92,6 +104,13 @@ from blocks import BLOCKS        # noqa: E402
 
 main.rng = random.Random(1)      # deterministic: no surprise battles while this script walks around
 main.tracker.chance = 0.0
+# MODs: the good one loaded, the broken one was skipped, the typo was reported, and the player is told in the game
+assert [m["id"] for m in main.MODS.loaded] == ["smoke_ok"], main.MODS.loaded
+assert len(main.MODS.errors) == 1 and "enabled" in main.MODS.errors[0], main.MODS.errors
+assert len(main.MODS.warnings) == 1 and "colour" in main.MODS.warnings[0], main.MODS.warnings
+assert "skipped" in main.message.text and "warning" in main.message.text, main.message.text
+main.message.enabled = False                               # (the notice has been read; later checks look at fresh messages)
+assert main.mod_summary() == "MODs: Smoke Mod (S:1 B:0)   (2 problem(s): see the terminal)", main.mod_summary()
 assert music_log[0][0] == "start" and music_log[0][1].startswith("bgm_field_v1_"), music_log[:2]
 assert not any("bgm_battle" in n and e == "start" for e, n in music_log), "only the field tune plays at the start"
 
@@ -265,6 +284,29 @@ print("battle won: Lv %d xp %d; log tail: %s" % (main.stats.level, main.stats.xp
 
 battle_starts = [n for e, n in music_log if e == "start" and n.startswith("bgm_battle")]
 print("battle tunes so far:", battle_starts)
+# a battle against a slime from a MOD: chosen by weight, named on the screen, fought like any other
+class PickLast(random.Random):
+    def randrange(self, stop, *a):
+        return stop - 1                                         # always the last entry = the MOD slime
+
+
+main.rng = PickLast(7)
+main.stats.base = {"hp": 400, "atk": 60, "def": 30, "spd": 30}
+main.stats.restore_full()
+main.open_battle()
+assert main.st.battle.enemy.name == "Smoke Slime", main.st.battle.enemy
+for _ in range(200):
+    main.update()
+assert "Smoke Slime appears" in main.battle_log.text, main.battle_log.text
+for _ in range(60):
+    if main.st.battle.phase != "choose":
+        break
+    act("tackle")
+assert main.st.battle.phase == "won" and any("Smoke Slime takes" in line for line in main.st.battle.log), main.st.battle.log
+finish()
+main.rng = random.Random(5)
+print("MOD slime: fought and beaten")
+
 # defeat = sudden death: all items lost, back at spawn, saved immediately
 main.inventory.add(ROCK, 5)
 main.stats.base = {"hp": 5, "atk": 1, "def": 1, "spd": 1}
@@ -591,6 +633,7 @@ inv_before = [list(x) if x else None for x in main.inventory.slots]
 # ---- Esc opens the menu; the world stands still while it is open
 main.input("escape")
 assert main.st.paused and main.menu.enabled
+assert "Smoke Mod" in main.menu_mods.text and "problem" in main.menu_mods.text, main.menu_mods.text
 frozen = (main.body.x, main.body.y, main.body.z)
 fake.held_keys["w"] = 1.0
 for _ in range(30):
@@ -657,7 +700,7 @@ assert main.ctx.book.get("0,0").storage.count(3) == 20, "village storage lost on
 assert abs(main.st.world_time - time_before) < 2.0, "time of day not restored after reload"   # a few frames pass before the last save
 assert main.st.world_time > 1.0, "a restored game must not start the clock from zero"
 assert abs(main.body.x - pos_before[0]) < 1e-6 and abs(main.body.z - pos_before[2]) < 1e-6
-assert main.message.text == "Save loaded", main.message.text
+assert main.message.text.startswith("Save loaded"), main.message.text            # (the MOD notice follows it)
 print("reloaded: block, inventory and position restored")
 
 

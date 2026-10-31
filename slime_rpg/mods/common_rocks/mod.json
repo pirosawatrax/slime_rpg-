@@ -1,0 +1,9 @@
+{
+  "id": "common_rocks",
+  "name": "Common Rock Varieties",
+  "version": "1.0.0",
+  "api_version": 1,
+  "enabled": true,
+  "author": "Slime RPG Sample",
+  "description": "Four mineral-free geological rock types that naturally form underground."
+}

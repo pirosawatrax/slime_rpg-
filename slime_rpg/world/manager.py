@@ -20,6 +20,18 @@ class ChunkManager:
         self.meshed = set()
         self._offsets = _offsets(C.DATA_RADIUS)
         self._last_center = None
+        self.world_time = 0.0
+
+    def update_world_time(self, world_time):
+        """Invalidate chunks exactly when a planted seed crosses its one-day growth threshold."""
+        previous = self.world_time
+        self.world_time = float(world_time)
+        if self.world_time <= previous:
+            return
+        for (cx, cz), chunk in self.world.chunks.items():
+            for (lx, y, lz), (_, planted_at) in chunk.plants.items():
+                if previous - planted_at < C.DAY_LENGTH <= self.world_time - planted_at:
+                    self.world._mark_dirty(cx, cz, lx, y, lz)
 
     def _dist2(self, cx, cz, pcx, pcz):
         return (cx - pcx) ** 2 + (cz - pcz) ** 2
@@ -28,7 +40,7 @@ class ChunkManager:
         padded = self.world.padded(cx, cz)
         minerals = self.world.chunks[(cx, cz)].minerals
         for sy in range(C.SECTIONS_PER_CHUNK):
-            self.on_mesh((cx, cz, sy), mesh_section(padded, sy, minerals))
+            self.on_mesh((cx, cz, sy), mesh_section(padded, sy, minerals, self.world.chunks[(cx, cz)].plants, self.world_time))
         self.meshed.add((cx, cz))
 
     def step(self, pcx, pcz):
@@ -38,7 +50,7 @@ class ChunkManager:
         # Player edits are rebuilt immediately so digging feels instant.
         for (cx, cz, sy) in w.pop_dirty():
             if (cx, cz) in self.meshed and w.has_chunk(cx, cz):
-                self.on_mesh((cx, cz, sy), mesh_section(w.padded(cx, cz), sy, w.chunks[(cx, cz)].minerals))
+                self.on_mesh((cx, cz, sy), mesh_section(w.padded(cx, cz), sy, w.chunks[(cx, cz)].minerals, w.chunks[(cx, cz)].plants, self.world_time))
 
         if self._last_center != (pcx, pcz):
             self._last_center = (pcx, pcz)

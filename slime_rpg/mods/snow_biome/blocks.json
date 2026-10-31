@@ -1,0 +1,22 @@
+[
+  {
+    "id": "snow",
+    "name": "Snow",
+    "hardness": 0.45,
+    "stack_limit": 64,
+    "sound": "soft",
+    "top": [245, 248, 255],
+    "side": [218, 229, 245],
+    "bottom": [190, 207, 229]
+  },
+  {
+    "id": "ice",
+    "name": "Ice",
+    "hardness": 1.4,
+    "stack_limit": 64,
+    "sound": "rock",
+    "top": [173, 218, 242],
+    "side": [139, 195, 229],
+    "bottom": [119, 174, 211]
+  }
+]

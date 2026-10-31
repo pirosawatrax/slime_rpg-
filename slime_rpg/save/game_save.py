@@ -10,6 +10,13 @@ from game.stats import PlayerStats
 from game.village import Flags, VillageBook, VillageState
 
 
+def _saved_item_id(item):
+    """Built-in items keep their historic integer IDs; custom blocks use stable namespaced keys."""
+    from blocks import BLOCKS
+    item = int(item)
+    return BLOCKS[item].key if item >= 7 and item in BLOCKS else item
+
+
 def build_meta(world, inventory, player, spawn, stats=None, clock=None, game=None):
     meta = {
         "save_version": C.SAVE_VERSION,
@@ -18,14 +25,14 @@ def build_meta(world, inventory, player, spawn, stats=None, clock=None, game=Non
         "seed": world.seed,
         "player": dict(player),                       # x, y, z, yaw, pitch, selected
         "spawn": [float(v) for v in spawn],
-        "inventory": [None if s is None else [int(s[0]), int(s[1])] for s in inventory.slots],
+        "inventory": [None if s is None else [_saved_item_id(s[0]), int(s[1])] for s in inventory.slots],
     }
     if clock is not None:
         meta["time"] = float(clock)
     if game is not None:
         meta["flags"] = {"boss_defeated": bool(game.flags.boss_defeated), "boss_known": bool(game.flags.boss_known)}
         meta["respawn"] = None if game.respawn is None else [float(v) for v in game.respawn]
-        meta["villages"] = {vid: {"storage": [None if sl is None else [int(sl[0]), int(sl[1])] for sl in st.storage.slots],
+        meta["villages"] = {vid: {"storage": [None if sl is None else [_saved_item_id(sl[0]), int(sl[1])] for sl in st.storage.slots],
                                   "request_done": st.request_done, "expanded": st.expanded, "tonic": st.tonic}
                             for vid, st in game.book.states.items()}
     if stats is not None:
@@ -39,7 +46,7 @@ def save_game(store, world, inventory, player, spawn, stats=None, clock=None, ga
     written = 0
     for ch in list(world.chunks.values()):
         if ch.modified:
-            store.save_chunk_edits(ch.cx, ch.cz, ch.edits)
+            store.save_chunk_edits(ch.cx, ch.cz, ch.edits, ch.plants)
             ch.modified = False                       # only after the write succeeded
             written += 1
     store.save_meta(build_meta(world, inventory, player, spawn, stats, clock, game))
@@ -54,7 +61,10 @@ def restore_inventory(rows, size=C.INVENTORY_SLOTS):
     for i, row in enumerate(rows[:size]):
         try:
             item, count = row
-            if items.is_valid_item(item) and isinstance(count, int) and not isinstance(count, bool):
+            if isinstance(item, str):
+                from blocks import id_for_key
+                item = id_for_key(item)
+            if item is not None and items.is_valid_item(item) and isinstance(count, int) and not isinstance(count, bool):
                 inv.slots[i] = [item, max(1, min(count, items.stack_limit(item)))]
         except (TypeError, ValueError):
             continue

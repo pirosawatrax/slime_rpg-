@@ -1,0 +1,11 @@
+[
+  {
+    "id": "my_stone",
+    "name": "My Stone",
+    "hardness": 2.0,
+    "stack_limit": 64,
+    "sound": "rock",
+    "color": [128, 132, 140],
+    "placeable": true
+  }
+]

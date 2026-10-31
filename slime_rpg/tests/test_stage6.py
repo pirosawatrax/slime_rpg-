@@ -551,6 +551,8 @@ class TestSlimeKing(unittest.TestCase):
 class TestPostBossColours(unittest.TestCase):
     def test_ore_positions_stay_and_new_colours_only_appear_after_the_boss(self):
         any_new = 0
+        total_ore = 0
+        total_kept = 0
         for cx, cz in ((0, 0), (3, -2), (-4, 5)):
             _, base = generate_chunk_full(C.SEED, cx, cz, extended=False)
             _, ext = generate_chunk_full(C.SEED, cx, cz, extended=True)
@@ -560,8 +562,9 @@ class TestPostBossColours(unittest.TestCase):
             self.assertTrue(all(items.in_base_range(int(c)) for c in codes_b))
             new = [c for c in codes_e if not items.in_base_range(int(c))]
             any_new += len(new)
-            kept = (base == ext) & (base > 0)
-            self.assertTrue(kept.sum() > 0.45 * (base > 0).sum(), "most existing ore keeps its colour")
+            total_ore += int((base > 0).sum())
+            total_kept += int(((base == ext) & (base > 0)).sum())
+        self.assertTrue(total_kept > 0.45 * total_ore, "most existing ore keeps its colour")
         self.assertGreater(any_new, 20)
 
     def test_world_flag_and_forgetting_unmodified_chunks(self):

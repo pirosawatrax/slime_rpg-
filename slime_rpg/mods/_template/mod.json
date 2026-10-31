@@ -1,0 +1,9 @@
+{
+  "id": "my_first_mod",
+  "name": "My First MOD",
+  "version": "1.0.0",
+  "api_version": 1,
+  "author": "your name",
+  "description": "Copy this folder, rename it, change the id, and edit slimes.json.",
+  "enabled": true
+}

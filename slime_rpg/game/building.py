@@ -2,7 +2,7 @@
 from collections import namedtuple
 
 import config as C
-from blocks import AIR, WATER, WOOD, PLACEABLE
+from blocks import AIR, WATER, WOOD, BLOCKS, PLACEABLE
 
 PlaceResult = namedtuple("PlaceResult", "placed cell block")
 
@@ -14,7 +14,8 @@ def try_place(world, inventory, slot, hit, body):
     if hit is None or item is None or item not in PLACEABLE:
         return nothing
     if hit.block == WATER:
-        if item != WOOD:
+        # Built-in and MOD-added wood-family blocks can form bridges.
+        if BLOCKS[item].sound != "wood":
             return nothing
         cell = hit.cell
     else:

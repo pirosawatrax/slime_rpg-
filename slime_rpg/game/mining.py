@@ -1,9 +1,11 @@
 """Hold-to-break mining (design 8.3-8.5). Pure logic: the renderer reads the returned events."""
 from dataclasses import dataclass, field
+import random
 
 import config as C
 import items
-from blocks import AIR, ROCK, BLOCKS, hardness_at, drop_of
+from blocks import AIR, ROCK, SOIL, GRASS, FLOWER, BLOCKS, hardness_at, drop_of
+from game.garden import seed_drop_code
 
 
 @dataclass
@@ -18,13 +20,17 @@ class MineResult:
 
 
 class Miner:
-    def __init__(self, world, inventory):
+    def __init__(self, world, inventory, rng=None):
         self.world = world
         self.inventory = inventory
         self.target = None
         self.progress = 0.0
         self._tick_timer = 0.0
         self._cooldown = 0.0
+        self.world_time = 0.0
+        # Use system-seeded randomness in normal play. A fixed seed here made every
+        # new game repeat the same drop sequence (the first 123 checks had no seed).
+        self.rng = rng if rng is not None else random.Random()
 
     def reset(self):
         self.target = None
@@ -44,6 +50,7 @@ class Miner:
         block = self.world.get_block(x, y, z)
         hardness = hardness_at(block, y)
         mineral = self.world.get_mineral(x, y, z) if block == ROCK else None
+        plant = self.world.get_plant(x, y, z) if block == FLOWER else None
         if hardness is not None and mineral is not None:
             hardness = items.mineral_hardness(mineral)             # richer ore is harder to dig out
         if hardness is None or self._cooldown > 0:
@@ -58,10 +65,16 @@ class Miner:
         self.progress += dt / hardness
         res.progress = min(self.progress, 1.0)
         if self.progress >= 1.0:
+            flower_ready = bool(plant and self.world_time - plant[1] >= C.DAY_LENGTH)
             self.world.remove_block(x, y, z)
             drops = []
+            if plant is not None:
+                color_code, planted_at = plant
+                drops.append(items.item_of(color_code) if flower_ready else items.seed_of(color_code))
             if mineral is not None:
-                drops.append(items.item_of(mineral))               # mineral first: if space is short, the plain rock is lost
+                drops.append(items.item_of(mineral))
+            if block in (SOIL, GRASS) and self.rng.random() < C.FLOWER_SEED_CHANCE:
+                drops.append(items.seed_of(seed_drop_code(self.rng, getattr(self.world, "extended", False))))               # mineral first: if space is short, the plain rock is lost
             if drop_of(block) is not None:
                 drops.append(drop_of(block))
             for item in drops:

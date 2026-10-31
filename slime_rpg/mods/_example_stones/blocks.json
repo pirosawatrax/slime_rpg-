@@ -1,0 +1,22 @@
+[
+  {
+    "id": "dark_basalt",
+    "name": "Dark Basalt",
+    "hardness": 3.0,
+    "stack_limit": 64,
+    "sound": "rock",
+    "top": [65, 67, 72],
+    "side": [48, 50, 55],
+    "bottom": [38, 40, 44],
+    "placeable": true
+  },
+  {
+    "id": "pale_limestone",
+    "name": "Pale Limestone",
+    "hardness": 1.6,
+    "stack_limit": 64,
+    "sound": "rock",
+    "color": [194, 187, 160],
+    "placeable": true
+  }
+]

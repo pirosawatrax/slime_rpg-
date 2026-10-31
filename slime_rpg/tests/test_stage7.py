@@ -106,7 +106,11 @@ class TestCaves(unittest.TestCase):
             below[:, 1:, :] = wood[:, :-1, :]
             base = wood & ~below
             for x, y, z in np.argwhere(base):
-                self.assertIn(int(b[x, y - 1, z]), (GRASS, SOIL, ROCK), (cx, cz, x, y, z))
+                support = int(b[x, y - 1, z])
+                from blocks import BLOCKS
+                self.assertTrue(support in (GRASS, SOIL, ROCK) or
+                                (support in BLOCKS and BLOCKS[support].sound == "rock"),
+                                (cx, cz, x, y, z, support))
                 checked += 1
         self.assertGreater(checked, 20)
 

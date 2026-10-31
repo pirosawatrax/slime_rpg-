@@ -19,6 +19,7 @@ class Enemy:
     defense: int
     spd: int
     color: tuple
+    name: str = "Slime"
 
 
 @dataclass
@@ -34,14 +35,28 @@ def random_color(rng, extended=False):
     return tuple(rng.uniform(lo, hi) for _ in range(3))
 
 
-def make_enemy(level, rng, extended=False):
-    """A slime of the given level: average stats for that level (x ENEMY_STRENGTH), each varied by
-    +-ENEMY_STAT_VARIATION, with a random colour (60..200 per channel; 40..220 once the boss has fallen)."""
+def make_enemy(level, rng, extended=False, mod_slimes=()):
+    """Create a vanilla slime or choose a data-only MOD archetype using weighted random selection."""
     avg = progression.average_stats(level)
     v = C.ENEMY_STAT_VARIATION
     stat = {s: max(1, int(round(avg[s] * C.ENEMY_STRENGTH * rng.uniform(1 - v, 1 + v)))) for s in progression.STATS}
+    name = "Slime"
     color = random_color(rng, extended)
-    return Enemy(level, stat["hp"], stat["hp"], stat["atk"], stat["def"], stat["spd"], color)
+    choices = [m for m in mod_slimes if isinstance(m, dict) and m.get("weight", 0) > 0]
+    # Vanilla slimes have weight 10, so a weight-2 MOD slime appears roughly 1 in 6 encounters.
+    total = 10 + sum(m["weight"] for m in choices)
+    roll = rng.randrange(total)
+    if roll >= 10:
+        roll -= 10
+        for mod in choices:
+            if roll < mod["weight"]:
+                name = mod["name"]
+                multiplier = mod["stat_multiplier"]
+                stat = {k: max(1, int(round(value * multiplier))) for k, value in stat.items()}
+                color = tuple(rng.uniform(lo, hi) for lo, hi in zip(mod["color_min"], mod["color_max"]))
+                break
+            roll -= mod["weight"]
+    return Enemy(level, stat["hp"], stat["hp"], stat["atk"], stat["def"], stat["spd"], color, name)
 
 
 def make_boss(rng, extended=False):
@@ -72,7 +87,7 @@ class Battle:
         (colour change every round with the next colour shown in advance, per-hit damage cap, no fleeing)."""
         self.stats, self.enemy, self.inventory, self.rng, self.name_of = stats, enemy, inventory, rng, name_of
         self.boss, self.extended = boss, extended
-        self.who = T.BOSS_NAME if boss else "Slime"
+        self.who = T.BOSS_NAME if boss else getattr(enemy, "name", "Slime")
         self.next_color = self._pick_boss_color() if boss else None
         self.boss_won = False
         self.phase = "choose"            # choose | won | lost | fled
@@ -81,13 +96,14 @@ class Battle:
         self._unread = 0
         self.xp_gained = 0
         self.level_ups = []
-        self._emit(T.BATTLE_APPEARED, None, "note")
+        name = getattr(enemy, "name", "Slime")
+        self._emit(T.BATTLE_APPEARED if name == "Slime" or boss else T.BATTLE_APPEARED_NAMED.format(name=name), None, "note")
 
     # ---- events -------------------------------------------------------
     def snapshot(self):
         s, e = self.stats, self.enemy
         return {"you_hp": max(0, s.hp), "you_max": s.max_hp, "you_level": s.level, "you_color": s.color,
-                "enemy_hp": max(0, e.hp), "enemy_max": e.max_hp, "enemy_level": e.level, "enemy_color": e.color,
+                "enemy_hp": max(0, e.hp), "enemy_max": e.max_hp, "enemy_level": e.level, "enemy_color": e.color, "enemy_name": e.name,
                 "boss": self.boss, "boss_next": self.next_color}
 
     def _emit(self, text, sound=None, kind="act"):

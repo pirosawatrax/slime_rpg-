@@ -1,0 +1,42 @@
+[
+  {
+    "id": "granite",
+    "name": "Granite",
+    "hardness": 2.7,
+    "stack_limit": 64,
+    "sound": "rock",
+    "top": [164, 174, 190],
+    "side": [137, 148, 166],
+    "bottom": [111, 122, 141]
+  },
+  {
+    "id": "basalt",
+    "name": "Basalt",
+    "hardness": 3.1,
+    "stack_limit": 64,
+    "sound": "rock",
+    "top": [76, 91, 111],
+    "side": [55, 67, 85],
+    "bottom": [39, 49, 65]
+  },
+  {
+    "id": "limestone",
+    "name": "Limestone",
+    "hardness": 1.9,
+    "stack_limit": 64,
+    "sound": "rock",
+    "top": [183, 190, 151],
+    "side": [157, 166, 126],
+    "bottom": [132, 141, 103]
+  },
+  {
+    "id": "red_rock",
+    "name": "Red Rock",
+    "hardness": 2.5,
+    "stack_limit": 64,
+    "sound": "rock",
+    "top": [176, 75, 66],
+    "side": [145, 51, 48],
+    "bottom": [113, 38, 39]
+  }
+]

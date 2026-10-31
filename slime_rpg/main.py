@@ -32,10 +32,12 @@ import items
 import strings as T
 from audio import music, sfx
 from audio.director import MusicDirector
-from blocks import BLOCKS, GRASS, WOOD
+from blocks import BLOCKS, GRASS, WOOD, register_mod_block
 from game import daytime, progression
 from game.battle import Battle, make_boss, make_enemy
+from mods.loader import load_mods
 from game.building import try_place
+from game.garden import planting_cell
 from game.death import apply_death
 from game.encounter import EncounterTracker
 from game.fog import fog_for_depth
@@ -62,6 +64,41 @@ window.exit_button.visible = False
 # One save slot. SLIME_SAVE_DIR overrides the folder; `python main.py --new` sets the old save aside first.
 SAVE_DIR = Path(os.environ.get("SLIME_SAVE_DIR") or Path(__file__).resolve().parent / "saves" / "default")
 store = SaveStore(SAVE_DIR)
+
+# Data-only MODs are loaded once at startup. No MOD Python code is executed. The folder is mods/ next to main.py,
+# or the one named in SLIME_MODS_DIR. See MODDING.md.
+MODS_DIR = Path(os.environ.get("SLIME_MODS_DIR") or Path(__file__).resolve().parent / "mods")
+MODS = load_mods(MODS_DIR)
+for _block in MODS.blocks:
+    _block["runtime_id"] = register_mod_block(
+        _block["mod_id"], _block["id"], _block["name"], _block["hardness"],
+        _block["stack_limit"], _block["sound"], _block["top"], _block["side"],
+        _block["bottom"], _block["placeable"])
+for _mod in MODS.loaded:
+    print(f"MOD loaded: {_mod['name']} ({_mod['slime_count']} slimes, {_mod['block_count']} blocks)")
+for _error in MODS.errors:
+    print(f"MOD skipped: {_error}")
+for _warning in MODS.warnings:
+    print(f"MOD warning: {_warning}")
+
+
+def mod_notices():
+    """Short in-game messages for the start of the game: the details are in the terminal."""
+    notes = []
+    if MODS.errors:
+        notes.append(T.MOD_NOTICE_SKIPPED.format(n=len(MODS.errors), first=MODS.errors[0][:90]))
+    if MODS.warnings:
+        notes.append(T.MOD_NOTICE_WARNINGS.format(n=len(MODS.warnings)))
+    return notes
+
+
+def mod_summary():
+    """One line for the pause menu."""
+    text = (T.MENU_MODS.format(names=", ".join(
+                f"{m['name']} (S:{m['slime_count']} B:{m['block_count']})" for m in MODS.loaded)[:80])
+            if MODS.loaded else T.MENU_MODS_NONE)
+    problems = len(MODS.errors) + len(MODS.warnings)
+    return text + (T.MENU_MODS_PROBLEMS.format(n=problems) if problems else "")
 
 
 def read_startup_save():
@@ -143,7 +180,10 @@ def item_name(item):
     if items.is_mineral(item):
         r, g, b = items.rgb(items.code_of(item))
         return T.MINERAL_NAME.format(r=r, g=g, b=b)
-    return T.BLOCK_NAMES[BLOCKS[item].key]
+    if items.is_seed(item):
+        r, g, b = items.rgb(items.seed_code(item))
+        return T.FLOWER_SEED_NAME.format(r=r, g=g, b=b)
+    return T.BLOCK_NAMES.get(BLOCKS[item].key, BLOCKS[item].key.split(":", 1)[-1].replace("_", " ").title())
 
 
 # ---------------------------------------------------------------- sound
@@ -431,6 +471,7 @@ def start_session(meta):
     set_hud(True)
     set_music("field")
     manager = ChunkManager(world, on_mesh, on_unload)
+    manager.update_world_time(st.world_time)
     for _ in range(60):                  # small head start so the first frame is not an empty void
         manager.step(int(math.floor(body.x)) >> 4, int(math.floor(body.z)) >> 4)
 
@@ -442,6 +483,7 @@ Text(parent=menu, text=T.MENU_TITLE, origin=(0, 0), position=(0, 0.28), scale=2)
 menu_status = Text(parent=menu, text="", origin=(0, 0), position=(0, -0.29), scale=1.1)
 Text(parent=menu, text=T.MENU_LOAD_HINT, origin=(0, 0), position=(0, -0.35), scale=0.8)
 menu_seed = Text(parent=menu, text="", origin=(0, 0), position=(0, -0.43), scale=0.8)
+menu_mods = Text(parent=menu, text="", origin=(0, 0), position=(0, -0.47), scale=0.8)
 
 
 def set_paused(flag):
@@ -453,6 +495,7 @@ def set_paused(flag):
         crack.enabled = False
         menu_status.text = ""
         menu_seed.text = T.MENU_SEED.format(seed=world.seed)
+        menu_mods.text = mod_summary()
     else:
         st.skip_look = 2
         st.need_release = True
@@ -565,7 +608,7 @@ def refresh_battle_ui():
         boss_next_swatch.enabled = True
         enemy_sprite.scale, enemy_sprite.position = (0.46, 0.46), (0.48, 0.24)
     else:
-        enemy_header.text = T.BATTLE_HEADER_ENEMY.format(level=snap["enemy_level"], hp=snap["enemy_hp"], max_hp=snap["enemy_max"],
+        enemy_header.text = T.BATTLE_HEADER_ENEMY.format(name=snap["enemy_name"], level=snap["enemy_level"], hp=snap["enemy_hp"], max_hp=snap["enemy_max"],
                                                          r=ec[0], g=ec[1], b=ec[2])
         boss_next_swatch.enabled = False
         enemy_sprite.scale, enemy_sprite.position = (0.34, 0.34), (0.48, 0.21)
@@ -605,7 +648,7 @@ def open_battle(boss=False):
         top = max(int(surface_heights(world.seed, math.floor(body.x), math.floor(body.z))), C.SEA_LEVEL)
         depth = top - int(body.y)
         distance = math.hypot(body.x - SPAWN[0], body.z - SPAWN[2])
-        enemy = make_enemy(progression.enemy_level(depth, distance, rng, boss_defeated=done), rng, extended=done)
+        enemy = make_enemy(progression.enemy_level(depth, distance, rng, boss_defeated=done), rng, extended=done, mod_slimes=MODS.slimes)
         st.battle = Battle(stats, enemy, inventory, rng, item_name, extended=done)
     presenter = BattlePresenter(st.battle.snapshot())
     presenter.push(st.battle.take_events())
@@ -765,6 +808,7 @@ def close_panel():
 
 
 _meta, _notices = read_startup_save()
+_notices = _notices + mod_notices()
 start_session(_meta)
 if _notices:
     notify("\n".join(_notices), 3.0)
@@ -782,6 +826,9 @@ def update():
     if st.paused or st.panel is not None:               # a menu or village screen is open: the world stands still
         return
     st.world_time += dt
+    miner.world_time = st.world_time
+    if manager is not None:
+        manager.update_world_time(st.world_time)
 
     # look (skipped for a moment after the cursor was released, to avoid a view jump)
     if st.skip_look > 0:
@@ -944,7 +991,16 @@ def input(key):
     if st.paused:
         return
     if key == "right mouse down":
-        if try_place(world, inventory, st.selected, st.hit, body).placed:
+        held = inventory.item_at(st.selected)
+        if held is not None and items.is_seed(held):
+            cell = planting_cell(world, st.hit)
+            if cell is not None and not body.overlaps_cell(*cell):
+                code = items.seed_code(held)
+                if world.plant_flower_seed(*cell, code, st.world_time):
+                    inventory.take(st.selected, 1)
+                    notify(T.FLOWER_PLANTED, 1.8)
+                    play("place")
+        elif try_place(world, inventory, st.selected, st.hit, body).placed:
             play("place")
     elif key == "scroll up":
         st.selected = (st.selected - 1) % len(inventory.slots)

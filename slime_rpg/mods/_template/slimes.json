@@ -1,0 +1,10 @@
+[
+  {
+    "id": "my_slime",
+    "name": "My Slime",
+    "weight": 3,
+    "stat_multiplier": 1.0,
+    "color_min": [60, 60, 60],
+    "color_max": [200, 200, 200]
+  }
+]

@@ -1,0 +1,90 @@
+[
+  {
+    "id": "yellow_sandstone",
+    "name": "Yellow Sandstone",
+    "hardness": 1.6,
+    "stack_limit": 64,
+    "sound": "rock",
+    "top": [
+      224,
+      190,
+      112
+    ],
+    "side": [
+      198,
+      160,
+      87
+    ],
+    "bottom": [
+      174,
+      137,
+      73
+    ]
+  },
+  {
+    "id": "red_sandstone",
+    "name": "Red Sandstone",
+    "hardness": 1.8,
+    "stack_limit": 64,
+    "sound": "rock",
+    "top": [
+      202,
+      112,
+      78
+    ],
+    "side": [
+      177,
+      83,
+      57
+    ],
+    "bottom": [
+      145,
+      65,
+      47
+    ]
+  },
+  {
+    "id": "white_sandstone",
+    "name": "White Sandstone",
+    "hardness": 1.4,
+    "stack_limit": 64,
+    "sound": "rock",
+    "top": [
+      230,
+      222,
+      196
+    ],
+    "side": [
+      207,
+      198,
+      174
+    ],
+    "bottom": [
+      181,
+      173,
+      151
+    ]
+  },
+  {
+    "id": "gray_sandstone",
+    "name": "Gray Sandstone",
+    "hardness": 2.0,
+    "stack_limit": 64,
+    "sound": "rock",
+    "top": [
+      151,
+      151,
+      145
+    ],
+    "side": [
+      125,
+      126,
+      122
+    ],
+    "bottom": [
+      101,
+      102,
+      100
+    ]
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "id": "example_stones",
+  "name": "Example Stones",
+  "version": "1.0.0",
+  "api_version": 1,
+  "enabled": true,
+  "description": "Example custom rock blocks"
+}
