@@ -46,7 +46,7 @@ INVENTORY_SLOTS = 20
 # Mining
 HIT_INTERVAL = 0.25          # seconds between hit sounds while holding the button
 BREAK_COOLDOWN = 0.15
-FLOWER_SEED_CHANCE = 0.025      # chance per dug soil/grass block to find a colour-coded flower seed        # pause after a block breaks
+FLOWER_SEED_CHANCE = 0.05      # chance per dug soil/grass block to find a colour-coded flower seed        # pause after a block breaks
 MESSAGE_COOLDOWN = 1.0       # throttle for "Inventory full" messages
 
 # Fog (distance in blocks) at the surface and deep underground
